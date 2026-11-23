@@ -1,0 +1,14 @@
+{
+  "name": "cursor-office",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A small desktop office for Cursor agents and Grok bots.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test office.test.mjs"
+  }
+}
