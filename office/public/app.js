@@ -9,7 +9,8 @@ let selected = null;
 let tick = 0;
 
 const poses = { working: '工作中', idle: '待命', waiting: '等你', error: '出錯' };
-const sources = { 'cursor-api': 'API', inbox: '心跳', local: '本機', 'cursor-cloud': '本機清單' };
+const sources = { 'cursor-api': '雲端', inbox: '心跳', local: '本機', 'cursor-cloud': '本機清單' };
+const uiFont = '12px "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif';
 
 function people() {
   return office?.agents || [];
@@ -24,7 +25,7 @@ function drawRoom(x, y, w, h, wall, floor, title, titleColor) {
   drawRect(x, y, w, h, wall);
   drawRect(x + 6, y + 22, w - 12, h - 30, floor);
   ctx.fillStyle = titleColor;
-  ctx.font = '12px sans-serif';
+  ctx.font = uiFont;
   ctx.fillText(title, x + 10, y + 15);
   drawRect(x + 18, y + 40, 28, 16, '#6d8ea8');
   drawRect(x + 22, y + 44, 20, 8, '#d7f4ff');
@@ -63,8 +64,8 @@ function draw() {
   drawRect(0, 0, 480, 300, '#87b84a');
   drawRect(0, 250, 480, 50, '#8d8d8d');
   drawRect(0, 268, 480, 8, '#f2d15a');
-  drawRoom(8, 8, 228, 236, '#35556e', '#d7dde6', 'Cursor', '#d6ecff');
-  drawRoom(244, 8, 228, 236, '#6a4a16', '#f3e2b8', 'Grok', '#ffe0a3');
+  drawRoom(8, 8, 228, 236, '#35556e', '#d7dde6', 'Cursor 房', '#d6ecff');
+  drawRoom(244, 8, 228, 236, '#6a4a16', '#f3e2b8', 'Grok 房', '#ffe0a3');
   const agents = people();
   const counts = { cursor: 0, grok: 0 };
   for (const agent of agents) {
@@ -77,8 +78,8 @@ function draw() {
   }
   if (!agents.length) {
     ctx.fillStyle = '#243044';
-    ctx.font = '13px sans-serif';
-    ctx.fillText('還沒有 agent 進辦公室', 150, 140);
+    ctx.font = '14px "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif';
+    ctx.fillText('還沒有人進辦公室', 156, 140);
   }
   requestAnimationFrame(draw);
 }
@@ -87,7 +88,7 @@ function renderChrome() {
   const agents = people();
   const cursorLink = office?.link?.cursor;
   const grokLink = office?.link?.grok;
-  const cursorText = cursorLink === 'api' ? 'Cursor API 已接上' : cursorLink === 'error' ? `Cursor：${office.link.detail}` : '尚未設定 API 金鑰，先看本機清單';
+  const cursorText = cursorLink === 'api' ? 'Cursor 已接上' : cursorLink === 'error' ? `Cursor：${office.link.detail}` : '尚未設定金鑰，先看本機清單';
   const grokText = grokLink === 'live' ? 'Grok 已進房' : 'Grok 待命';
   link.textContent = `${cursorText} · ${grokText}`;
 
@@ -95,7 +96,7 @@ function renderChrome() {
   if (!agents.length) {
     const note = document.createElement('p');
     note.className = 'empty';
-    note.textContent = '把 Cursor API 金鑰放到 ~/.cursor-office/config.json，或讓 Grok bot 對 /api/inbox 送心跳。';
+    note.textContent = '把金鑰寫進 ~/.cursor-office/config.json，或讓 Grok 機器人對 /api/inbox 回報狀態。';
     roster.append(note);
   }
   for (const agent of agents) {
@@ -105,7 +106,8 @@ function renderChrome() {
     const via = sources[agent.source] || agent.source || '';
     button.innerHTML = `<strong></strong><small></small>`;
     button.querySelector('strong').textContent = agent.name;
-    button.querySelector('small').textContent = `${agent.room === 'grok' ? 'Grok' : 'Cursor'} · ${poses[agent.status] || agent.status}${agent.model ? ` · ${agent.model}` : ''}${via ? ` · ${via}` : ''}`;
+    const room = agent.room === 'grok' ? 'Grok 機器人' : 'Cursor 代理';
+    button.querySelector('small').textContent = `${room} · ${poses[agent.status] || agent.status}${agent.model ? ` · ${agent.model}` : ''}${via ? ` · ${via}` : ''}`;
     button.addEventListener('click', () => {
       selected = agent.id;
       renderChrome();

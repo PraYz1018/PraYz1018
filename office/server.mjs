@@ -16,7 +16,7 @@ const inboxTtlMs = 120_000;
 const inbox = new Map();
 const seen = new Map();
 const activity = [];
-let snapshot = emptySnapshot('starting');
+let snapshot = emptySnapshot('啟動中');
 
 function emptySnapshot(detail) {
   return {
@@ -93,7 +93,7 @@ async function fetchCursor(key) {
     payload = null;
   }
   if (!response.ok) {
-    const message = payload?.message || payload?.error || `Cursor API ${response.status}`;
+    const message = payload?.message || payload?.error || `Cursor 連線失敗（${response.status}）`;
     throw new Error(String(message));
   }
   return cursorItems(payload).map((item) => fromCursorApi(item)).filter((agent) => agent.id);
@@ -107,17 +107,17 @@ async function refresh() {
     try {
       apiAgents = await fetchCursor(key);
       link.cursor = 'api';
-      link.detail = 'Cursor Cloud Agents 已接上';
+      link.detail = '已接上 Cursor 雲端代理';
     } catch (error) {
       link.cursor = 'error';
-      link.detail = error instanceof Error ? error.message : 'Cursor API 失敗';
+      link.detail = error instanceof Error ? error.message : 'Cursor 連線失敗';
     }
   } else {
-    link.detail = '尚未設定 Cursor API 金鑰';
+    link.detail = '尚未設定 Cursor 金鑰';
   }
   const feed = loadFeed();
   const beats = liveInbox();
-  if (feed.length && link.cursor !== 'api') link.detail = '顯示本機清單。設定 API 金鑰後會改看 Cursor Cloud Agents';
+  if (feed.length && link.cursor !== 'api') link.detail = '正在顯示本機清單。設定金鑰後會改看雲端代理';
   const agents = mergeAgents([feed, apiAgents, beats]);
   if (agents.some((agent) => agent.room === 'grok')) link.grok = 'live';
   remember(agents);
@@ -138,7 +138,7 @@ function readBody(request) {
     request.on('data', (chunk) => {
       size += chunk.length;
       if (size > 32_768) {
-        reject(new Error('payload too large'));
+        reject(new Error('內容太大'));
         request.destroy();
         return;
       }
@@ -150,7 +150,7 @@ function readBody(request) {
       try {
         resolve(JSON.parse(raw));
       } catch {
-        reject(new Error('invalid json'));
+        reject(new Error('不是有效的 JSON'));
       }
     });
     request.on('error', reject);
@@ -185,7 +185,7 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/inbox') {
       const agent = fromInbox(await readBody(request));
       if (!agent) {
-        send(response, 400, JSON.stringify({ ok: false, error: 'id and name are required' }));
+        send(response, 400, JSON.stringify({ ok: false, error: '需要代號和名稱' }));
         return;
       }
       inbox.set(agent.id, { agent, expires: Date.now() + inboxTtlMs });
@@ -196,7 +196,7 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'GET') {
       const file = publicFile(url.pathname);
       if (!file || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-        send(response, 404, JSON.stringify({ ok: false, error: 'not found' }));
+        send(response, 404, JSON.stringify({ ok: false, error: '找不到' }));
         return;
       }
       const ext = path.extname(file);
@@ -204,9 +204,9 @@ const server = http.createServer(async (request, response) => {
       fs.createReadStream(file).pipe(response);
       return;
     }
-    send(response, 405, JSON.stringify({ ok: false, error: 'method not allowed' }));
+    send(response, 405, JSON.stringify({ ok: false, error: '不支援這個方法' }));
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'error';
+    const message = error instanceof Error ? error.message : '發生錯誤';
     send(response, 400, JSON.stringify({ ok: false, error: message }));
   }
 });
