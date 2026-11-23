@@ -1,0 +1,19 @@
+{
+  "name": "cursor-office",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A desktop pixel office for Cursor agents and Grok bots.",
+  "type": "module",
+  "main": "desktop.mjs",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "server": "node server.mjs",
+    "test": "node --test office.test.mjs"
+  },
+  "dependencies": {
+    "electron": "^33.4.11"
+  }
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>櫃檯</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand"><canvas id="mark" width="28" height="28"></canvas><span>櫃檯</span></div>
+        <div id="stats" class="stats"></div>
+        <div id="link" class="link">正在看辦公室…</div>
+      </header>
+      <div class="body">
+        <aside class="roster">
+          <div class="roster-head">
+            <h1>名單</h1>
+            <input id="filter" type="search" placeholder="搜尋代理或房間" />
+          </div>
+          <div id="roster" class="roster-list"></div>
+        </aside>
+        <div class="world">
+          <canvas id="floor"></canvas>
+          <section class="activity">
+            <header>動態</header>
+            <ul id="activity"></ul>
+          </section>
+        </div>
+      </div>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
