@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fromCursorApi, fromFeed, fromInbox, mergeAgents, splitRooms, mapStatus } from './lib.mjs';
+import { placeAgents } from './public/scene.js';
 
 test('Cursor API status becomes a room and a pose', () => {
   const active = fromCursorApi({
@@ -54,4 +55,17 @@ test('local feed can place a Grok bot without going through the API', () => {
   ]);
   assert.equal(rooms.cursor.length, 1);
   assert.equal(rooms.grok[0].name, '圖片Q版化');
+});
+
+test('people stand in their own room before spilling into the lounge', () => {
+  const placed = placeAgents([
+    { id: 'c1', name: 'Cursor desk', room: 'cursor' },
+    { id: 'g1', name: '圖片Q版化', room: 'grok' },
+    { id: 'c2', name: 'Second', room: 'cursor' },
+    { id: 'c3', name: 'Third', room: 'cursor' },
+    { id: 'c4', name: 'Fourth', room: 'cursor' },
+  ]);
+  assert.equal(placed.find((item) => item.agent.id === 'g1').room, 'grok');
+  assert.equal(placed.filter((item) => item.room === 'cursor').length, 3);
+  assert.equal(placed.find((item) => item.agent.id === 'c4').room, 'reception');
 });

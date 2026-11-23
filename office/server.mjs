@@ -200,7 +200,7 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       const ext = path.extname(file);
-      response.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+      response.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' });
       fs.createReadStream(file).pipe(response);
       return;
     }
@@ -211,13 +211,32 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-await refresh();
-setInterval(() => {
-  refresh().catch((error) => {
-    snapshot = { ...snapshot, link: { ...snapshot.link, cursor: 'error', detail: error.message } };
-  });
-}, 8_000);
+let booted = null;
 
-server.listen(port, host, () => {
-  console.log(`櫃檯 http://${host}:${port}`);
-});
+export function bootOffice() {
+  if (booted) return booted;
+  booted = new Promise((resolve, reject) => {
+    refresh()
+      .catch((error) => {
+        snapshot = { ...snapshot, link: { ...snapshot.link, cursor: 'error', detail: error.message } };
+      })
+      .then(() => {
+        setInterval(() => {
+          refresh().catch((error) => {
+            snapshot = { ...snapshot, link: { ...snapshot.link, cursor: 'error', detail: error.message } };
+          });
+        }, 8_000);
+        server.once('error', reject);
+        server.listen(port, host, () => {
+          resolve({ url: `http://${host}:${port}`, port, host });
+        });
+      });
+  });
+  return booted;
+}
+
+const launchedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (launchedDirectly) {
+  const { url } = await bootOffice();
+  console.log(`櫃檯資料服務 ${url}`);
+}

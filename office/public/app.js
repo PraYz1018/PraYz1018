@@ -1,159 +1,203 @@
-const canvas = document.querySelector('#floor');
-const ctx = canvas.getContext('2d');
+import { drawAvatar, pickAgent, poseLabel, renderOffice } from './scene.js';
+
+const floor = document.querySelector('#floor');
 const roster = document.querySelector('#roster');
 const activity = document.querySelector('#activity');
 const link = document.querySelector('#link');
+const stats = document.querySelector('#stats');
+const filter = document.querySelector('#filter');
+
+const statusLabel = { working: '工作中', waiting: '等你', error: '出錯', idle: '待命' };
+const roomLabel = { grok: 'Grok 室', cursor: 'Cursor 室' };
+const sourceLabel = { 'cursor-api': '雲端', inbox: '心跳', 'cursor-cloud': '本機清單', local: '本機清單' };
 
 let office = null;
-let selected = null;
-let tick = 0;
+let selected = '';
+let query = '';
 
-const poses = { working: '工作中', idle: '待命', waiting: '等你', error: '出錯' };
-const sources = { 'cursor-api': '雲端', inbox: '心跳', local: '本機', 'cursor-cloud': '本機清單' };
-const uiFont = '12px "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif';
-
-function people() {
-  return office?.agents || [];
+function paintMark() {
+  const canvas = document.querySelector('#mark');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 28, 28);
+  ctx.fillStyle = '#3f8f32';
+  ctx.fillRect(0, 0, 28, 28);
+  ctx.fillStyle = '#c9a36a';
+  ctx.fillRect(4, 10, 20, 14);
+  ctx.fillStyle = '#5c5348';
+  ctx.fillRect(4, 8, 20, 3);
+  ctx.fillStyle = '#7dcea0';
+  ctx.fillRect(8, 16, 4, 4);
+  ctx.fillStyle = '#f0c36a';
+  ctx.fillRect(16, 16, 4, 4);
 }
 
-function drawRect(x, y, w, h, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w, h);
-}
-
-function drawRoom(x, y, w, h, wall, floor, title, titleColor) {
-  drawRect(x, y, w, h, wall);
-  drawRect(x + 6, y + 22, w - 12, h - 30, floor);
-  ctx.fillStyle = titleColor;
-  ctx.font = uiFont;
-  ctx.fillText(title, x + 10, y + 15);
-  drawRect(x + 18, y + 40, 28, 16, '#6d8ea8');
-  drawRect(x + 22, y + 44, 20, 8, '#d7f4ff');
-  drawRect(x + w - 62, y + 78, 36, 16, '#8b5a3c');
-  drawRect(x + w - 58, y + 70, 28, 10, '#223');
-  drawRect(x + w - 50, y + 68, 12, 4, '#9be7a4');
-  drawRect(x + 16, y + h - 36, 10, 16, '#2f7d32');
-  drawRect(x + 14, y + h - 42, 14, 8, '#43a047');
-}
-
-function drawPerson(x, y, color, status) {
-  const bob = status === 'working' ? Math.round(Math.sin(tick / 8) * 1) : 0;
-  const py = y + bob;
-  drawRect(x + 1, py + 18, 12, 2, 'rgba(0,0,0,0.28)');
-  drawRect(x + 2, py, 10, 4, color);
-  drawRect(x + 3, py + 4, 8, 6, '#f3d2b0');
-  drawRect(x + 5, py + 6, 1, 1, '#1b1b1b');
-  drawRect(x + 8, py + 6, 1, 1, '#1b1b1b');
-  drawRect(x + 2, py + 10, 10, 6, color);
-  drawRect(x + 3, py + 16, 3, 4, '#243044');
-  drawRect(x + 8, py + 16, 3, 4, '#243044');
-  const dot = { working: '#7CFF6B', waiting: '#ffd15c', error: '#ff6b6b', idle: '#d7d7d7' }[status] || '#fff';
-  drawRect(x + 12, py, 3, 3, dot);
-}
-
-function slot(room, index) {
-  const baseX = room === 'grok' ? 262 : 18;
-  const col = index % 4;
-  const row = Math.floor(index / 4);
-  return { x: baseX + 16 + col * 46, y: 78 + row * 42 };
-}
-
-function draw() {
-  tick += 1;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawRect(0, 0, 480, 300, '#87b84a');
-  drawRect(0, 250, 480, 50, '#8d8d8d');
-  drawRect(0, 268, 480, 8, '#f2d15a');
-  drawRoom(8, 8, 228, 236, '#35556e', '#d7dde6', 'Cursor 房', '#d6ecff');
-  drawRoom(244, 8, 228, 236, '#6a4a16', '#f3e2b8', 'Grok 房', '#ffe0a3');
-  const agents = people();
-  const counts = { cursor: 0, grok: 0 };
-  for (const agent of agents) {
-    const at = slot(agent.room, counts[agent.room] || 0);
-    counts[agent.room] = (counts[agent.room] || 0) + 1;
-    const color = agent.room === 'grok' ? '#e2a21b' : '#3d8bfd';
-    drawPerson(at.x, at.y, color, agent.status);
-    agent._hit = { x: at.x, y: at.y, w: 16, h: 22 };
-    if (selected === agent.id) drawRect(at.x - 2, at.y - 3, 16, 1, '#fff');
+function resize() {
+  const rect = floor.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  if (floor.width !== width || floor.height !== height) {
+    floor.width = width;
+    floor.height = height;
   }
-  if (!agents.length) {
-    ctx.fillStyle = '#243044';
-    ctx.font = '14px "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif';
-    ctx.fillText('還沒有人進辦公室', 156, 140);
-  }
-  requestAnimationFrame(draw);
 }
 
-function renderChrome() {
-  const agents = people();
-  const cursorLink = office?.link?.cursor;
-  const grokLink = office?.link?.grok;
-  const cursorText = cursorLink === 'api' ? 'Cursor 已接上' : cursorLink === 'error' ? `Cursor：${office.link.detail}` : '尚未設定金鑰，先看本機清單';
-  const grokText = grokLink === 'live' ? 'Grok 已進房' : 'Grok 待命';
-  link.textContent = `${cursorText} · ${grokText}`;
+function linkText(snapshot) {
+  const cursor = snapshot?.link?.cursor;
+  const grok = snapshot?.link?.grok === 'live' ? 'Grok 已進房' : 'Grok 待命';
+  if (cursor === 'api') return `Cursor 已接上 · ${grok}`;
+  if (cursor === 'error') return `Cursor 連線失敗 · ${grok}`;
+  return `尚未設定金鑰 · ${grok}`;
+}
 
+function renderStats(snapshot) {
+  const agents = snapshot?.agents || [];
+  const working = agents.filter((agent) => agent.status === 'working').length;
+  const grok = agents.filter((agent) => agent.room === 'grok').length;
+  const items = [
+    ['4', '房間'],
+    [String(agents.length), '代理'],
+    [String(working), '工作中'],
+    [String(grok), 'Grok'],
+  ];
+  stats.replaceChildren();
+  for (const [value, label] of items) {
+    const node = document.createElement('div');
+    node.className = 'stat';
+    const number = document.createElement('b');
+    number.textContent = value;
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    node.append(number, caption);
+    stats.append(node);
+  }
+}
+
+function matches(agent) {
+  if (!query) return true;
+  const haystack = `${agent.name} ${agent.task} ${agent.model} ${roomLabel[agent.room] || ''}`.toLowerCase();
+  return haystack.includes(query);
+}
+
+function renderRoster(snapshot) {
+  const agents = (snapshot?.agents || []).filter(matches);
   roster.replaceChildren();
+  if (!snapshot?.agents?.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = '把金鑰寫進 ~/.cursor-office/config.json，或讓 Grok 機器人對本機心跳回報狀態。';
+    roster.append(empty);
+    return;
+  }
   if (!agents.length) {
-    const note = document.createElement('p');
-    note.className = 'empty';
-    note.textContent = '把金鑰寫進 ~/.cursor-office/config.json，或讓 Grok 機器人對 /api/inbox 回報狀態。';
-    roster.append(note);
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = '沒有符合的代理。';
+    roster.append(empty);
+    return;
   }
-  for (const agent of agents) {
-    const button = document.createElement('button');
-    button.className = 'person';
-    button.dataset.selected = String(selected === agent.id);
-    const via = sources[agent.source] || agent.source || '';
-    button.innerHTML = `<strong></strong><small></small>`;
-    button.querySelector('strong').textContent = agent.name;
-    const room = agent.room === 'grok' ? 'Grok 機器人' : 'Cursor 代理';
-    button.querySelector('small').textContent = `${room} · ${poses[agent.status] || agent.status}${agent.model ? ` · ${agent.model}` : ''}${via ? ` · ${via}` : ''}`;
-    button.addEventListener('click', () => {
-      selected = agent.id;
-      renderChrome();
-    });
-    roster.append(button);
+  for (const room of ['grok', 'cursor']) {
+    const group = agents.filter((agent) => (room === 'grok' ? agent.room === 'grok' : agent.room !== 'grok'));
+    if (!group.length) continue;
+    const title = document.createElement('div');
+    title.className = 'group-title';
+    title.textContent = `${roomLabel[room]} · ${group.length}`;
+    roster.append(title);
+    for (const agent of group) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `card${agent.id === selected ? ' selected' : ''}`;
+      const avatar = document.createElement('canvas');
+      avatar.width = 36;
+      avatar.height = 36;
+      drawAvatar(avatar, agent);
+      const text = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = agent.name;
+      const task = document.createElement('div');
+      task.className = 'task';
+      const dot = document.createElement('i');
+      dot.className = `dot ${agent.status}`;
+      task.append(dot, document.createTextNode(`${statusLabel[agent.status] || '待命'} · ${poseLabel(agent)}`));
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = [agent.model, sourceLabel[agent.source] || '本機清單'].filter(Boolean).join(' · ');
+      text.append(name, task, meta);
+      card.append(avatar, text);
+      card.addEventListener('click', () => {
+        selected = agent.id;
+        renderRoster(office);
+      });
+      roster.append(card);
+    }
   }
+}
 
+function renderActivity(snapshot) {
   activity.replaceChildren();
-  const rows = office?.activity || [];
+  const rows = snapshot?.activity || [];
   if (!rows.length) {
-    const note = document.createElement('div');
-    note.className = 'empty';
-    note.textContent = '活動會出現在這裡。';
-    activity.append(note);
+    const item = document.createElement('li');
+    item.textContent = '還沒有動靜。';
+    activity.append(item);
+    return;
   }
   for (const row of rows) {
-    const line = document.createElement('div');
-    const who = document.createElement('strong');
-    who.textContent = row.name;
-    const rest = document.createElement('small');
-    rest.textContent = `  ${row.text}`;
-    line.append(who, rest);
-    activity.append(line);
+    const item = document.createElement('li');
+    const time = document.createElement('time');
+    time.textContent = new Date(row.at).toLocaleTimeString('zh-Hant', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Taipei',
+    });
+    const text = document.createElement('span');
+    text.textContent = `${row.name}　${row.text}`;
+    item.append(time, text);
+    activity.append(item);
   }
 }
 
-canvas.addEventListener('click', (event) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-  const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
-  const hit = people().find((agent) => agent._hit && x >= agent._hit.x && x <= agent._hit.x + agent._hit.w && y >= agent._hit.y && y <= agent._hit.y + agent._hit.h);
-  selected = hit ? hit.id : null;
-  renderChrome();
-});
+function render(tick) {
+  resize();
+  renderOffice(floor, office || { agents: [] }, tick, selected);
+}
 
 async function poll() {
   const response = await fetch('/api/office');
   office = await response.json();
-  if (selected && !people().some((agent) => agent.id === selected)) selected = null;
-  renderChrome();
+  if (selected && !(office.agents || []).some((agent) => agent.id === selected)) selected = '';
+  link.textContent = linkText(office);
+  renderStats(office);
+  renderRoster(office);
+  renderActivity(office);
 }
 
-requestAnimationFrame(draw);
-poll().catch((error) => {
-  link.textContent = error.message;
+filter.addEventListener('input', () => {
+  query = filter.value.trim().toLowerCase();
+  renderRoster(office);
+});
+
+floor.addEventListener('click', (event) => {
+  const rect = floor.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * (floor.width / rect.width);
+  const y = (event.clientY - rect.top) * (floor.height / rect.height);
+  selected = pickAgent(x, y);
+  renderRoster(office);
+});
+
+paintMark();
+requestAnimationFrame(function frame(tick) {
+  render(tick);
+  requestAnimationFrame(frame);
+});
+poll().catch(() => {
+  link.textContent = '辦公室還沒準備好';
 });
 setInterval(() => {
-  poll().catch(() => {});
+  poll().catch(() => {
+    link.textContent = '辦公室還沒準備好';
+  });
 }, 2000);
